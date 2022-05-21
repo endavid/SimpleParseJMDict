@@ -7,5 +7,14 @@
 
 import Foundation
 
-print("Hello, World!")
+func main() {
+    do {
+        let jmDict = try parseCLI()
+        jmDict.printStats()
+    } catch {
+        print(error.localizedDescription)
+    }
+}
+
+main()
 
