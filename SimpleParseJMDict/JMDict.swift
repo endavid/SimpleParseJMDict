@@ -20,11 +20,13 @@ enum JMDictError: LocalizedError {
 
 struct JMDictEntry {
     let readings: [String]
+    let kanji: [String]
     let definitions: [String]
 }
 
 struct DictWord {
     let reading: String
+    let kanji: [String]
     let definitions: [String]
 }
 
@@ -76,7 +78,7 @@ class JMDict {
                 let entry = try JMDict.readEntry(xml: currentEntryLines)
                 for reading in entry.readings {
                     let hiraganed = reading.hiragana!
-                    words[hiraganed] = DictWord(reading: reading, definitions: entry.definitions)
+                    words[hiraganed] = DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions)
                 }
                 inEntry = false
                 currentEntry += 1
@@ -106,10 +108,16 @@ class JMDict {
             let glosses = try captureXMLRecords(tag: "gloss", in: sense)
             definitions.append(contentsOf: glosses)
         }
+        var kanji: [String] = []
+        let k_eles = try captureXMLRecords(tag: "k_ele", in: xml)
+        for k_ele in k_eles {
+            let kebs = try captureXMLRecords(tag: "keb", in: k_ele)
+            kanji.append(contentsOf: kebs)
+        }
         // do not convert any katakana to hiragana here;
         // when doing string comparison, use .hiragana as we'd use lowercase in English
         //let hiraganed = readings.compactMap { $0.hiragana }
-        return JMDictEntry(readings: readings, definitions: definitions)
+        return JMDictEntry(readings: readings, kanji: kanji, definitions: definitions)
     }
     
     func printStats() {
@@ -119,7 +127,7 @@ class JMDict {
         for word in words {
             print(word)
             i += 0
-            if i > 2000 {
+            if i > 200 {
                 break
             }
         }
