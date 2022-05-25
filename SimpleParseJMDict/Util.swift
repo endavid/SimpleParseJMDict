@@ -101,7 +101,8 @@ func captureXMLRecords(tag: String, in line: String) throws -> [String] {
     for i in closings {
         let end = line.index(i, offsetBy: closingTag.count)
         let s = String(line[start..<end])
-        let m = getGroupsFromRegex(pattern: "<\(tag)( .*)?>(.*)</\(tag)>", in: s)
+        // (?:...) non-capturing parentheses
+        let m = getGroupsFromRegex(pattern: "<\(tag)(?: .*)?>(.*)</\(tag)>", in: s)
         let flat = m.flatMap { $0 }
         matches.append(contentsOf: flat)
         start = end
