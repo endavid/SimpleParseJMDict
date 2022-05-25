@@ -19,11 +19,17 @@ enum JMDictError: LocalizedError {
 }
 
 struct JMDictEntry {
-    var readings: [String]
+    let readings: [String]
+    let definitions: [String]
+}
+
+struct DictWord {
+    let reading: String
+    let definitions: [String]
 }
 
 class JMDict {
-    let words: [String]
+    let words: [String: DictWord]
     
     init(fileUrl: URL) throws {
         // https://stackoverflow.com/a/62112007/1765629
@@ -53,7 +59,7 @@ class JMDict {
         var inEntry = false
         var currentEntry = 0
         var currentEntryLines = ""
-        var words: [String] = []
+        var words: [String: DictWord] = [:]
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
             let line = String.init(cString:lineByteArrayPointer!)
@@ -68,7 +74,10 @@ class JMDict {
                 // instead of keeping all the file in memory, we parse a few lines at a time,
                 // the <entry>...</entry> block
                 let entry = try JMDict.readEntry(xml: currentEntryLines)
-                words.append(contentsOf: entry.readings)
+                for reading in entry.readings {
+                    let hiraganed = reading.hiragana!
+                    words[hiraganed] = DictWord(reading: reading, definitions: entry.definitions)
+                }
                 inEntry = false
                 currentEntry += 1
             } else if inEntry {
@@ -91,17 +100,28 @@ class JMDict {
             let rebs = try captureXMLRecords(tag: "reb", in: readingElement)
             readings.append(contentsOf: rebs)
         }
+        var definitions: [String] = []
+        let senses = try captureXMLRecords(tag: "sense", in: xml)
+        for sense in senses {
+            let glosses = try captureXMLRecords(tag: "gloss", in: sense)
+            definitions.append(contentsOf: glosses)
+        }
         // do not convert any katakana to hiragana here;
         // when doing string comparison, use .hiragana as we'd use lowercase in English
         //let hiraganed = readings.compactMap { $0.hiragana }
-        return JMDictEntry(readings: readings)
+        return JMDictEntry(readings: readings, definitions: definitions)
     }
     
     func printStats() {
         print("#words: \(words.count)")
         // random word sample
-        for i in 2000..<2100 {
-            print(words[i])
+        var i = 0
+        for word in words {
+            print(word)
+            i += 0
+            if i > 2000 {
+                break
+            }
         }
     }
 }

@@ -73,7 +73,7 @@ extension String {
 
 func getGroupsFromRegex(pattern: String, in line: String) -> [[String]] {
     let range = NSRange(location: 0, length: line.utf16.count)
-    let regex = try? NSRegularExpression(pattern: pattern, options: [])
+    let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
     guard let matches = regex?.matches(in: line, options: [], range: range) else {
         return []
     }
@@ -94,17 +94,17 @@ func getGroupsFromRegex(pattern: String, in line: String) -> [[String]] {
 }
 
 func captureXMLRecords(tag: String, in line: String) throws -> [String] {
-    let tagOpens = line.indices(of: "<\(tag)>")
-    let tagCloses = line.indices(of: "</\(tag)>")
-    if tagOpens.count != tagCloses.count {
-        throw XMLError.unclosedTag(tag: tag)
+    let closingTag = "</\(tag)>"
+    let closings = line.indices(of: closingTag)
+    var matches: [String] = []
+    var start = line.startIndex
+    for i in closings {
+        let end = line.index(i, offsetBy: closingTag.count)
+        let s = String(line[start..<end])
+        let m = getGroupsFromRegex(pattern: "<\(tag)( .*)?>(.*)</\(tag)>", in: s)
+        let flat = m.flatMap { $0 }
+        matches.append(contentsOf: flat)
+        start = end
     }
-    var out: [String] = []
-    for i in 0..<tagOpens.count {
-        let a = line.index(tagOpens[i], offsetBy: tag.count + 2)
-        let b = tagCloses[i]
-        let r = a..<b
-        out.append(String(line[r]))
-    }
-    return out
+    return matches
 }
