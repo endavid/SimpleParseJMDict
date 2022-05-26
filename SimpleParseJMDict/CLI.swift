@@ -31,5 +31,5 @@ func parseCLI() throws -> JMDict {
         throw CLIError.fileDoesNotExist(name: filename)
     }
     let fileUrl = URL(fileURLWithPath: filename)
-    return try JMDict(fileUrl: fileUrl)
+    return try JMDict(fileUrl: fileUrl, minWordLength: 2)
 }

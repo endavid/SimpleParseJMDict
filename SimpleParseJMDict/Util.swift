@@ -69,6 +69,22 @@ extension String {
     var hiragana: String? {
         return self.applyingTransform(.hiraganaToKatakana, reverse: true)
     }
+    var oomoji: String {
+        // ["〜", "ぁ", "あ", "ぃ", "い", "ぅ", "う", "ぇ", "え", "ぉ", "お", "か", "が", "き", "ぎ", "く", "ぐ", "け", "げ", "こ", "ご", "さ", "ざ", "し", "じ", "す", "ず", "せ", "ぜ", "そ", "ぞ", "た", "だ", "ち", "ぢ", "っ", "つ", "づ", "て", "で", "と", "ど", "な", "に", "ぬ", "ね", "の", "は", "ば", "ぱ", "ひ", "び", "ぴ", "ふ", "ぶ", "ぷ", "へ", "べ", "ぺ", "ほ", "ぼ", "ぽ", "ま", "み", "む", "め", "も", "ゃ", "や", "ゅ", "ゆ", "ょ", "よ", "ら", "り", "る", "れ", "ろ", "ゎ", "わ", "ゐ", "ゑ", "を", "ん", "ゔ", "・"]
+        var s = self.replacingOccurrences(of: "・", with: "")
+        s = s.replacingOccurrences(of: "ぁ", with: "あ")
+        s = s.replacingOccurrences(of: "ぃ", with: "い")
+        s = s.replacingOccurrences(of: "ぅ", with: "う")
+        s = s.replacingOccurrences(of: "ぇ", with: "え")
+        s = s.replacingOccurrences(of: "ぉ", with: "お")
+        s = s.replacingOccurrences(of: "ぉ", with: "お")
+        s = s.replacingOccurrences(of: "っ", with: "つ")
+        s = s.replacingOccurrences(of: "ゃ", with: "や")
+        s = s.replacingOccurrences(of: "ゅ", with: "ゆ")
+        s = s.replacingOccurrences(of: "ょ", with: "よ")
+        s = s.replacingOccurrences(of: "ゎ", with: "わ")
+        return s
+    }
 }
 
 func getGroupsFromRegex(pattern: String, in line: String) -> [[String]] {

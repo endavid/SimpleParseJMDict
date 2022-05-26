@@ -33,7 +33,7 @@ struct DictWord {
 class JMDict {
     let words: [String: DictWord]
     
-    init(fileUrl: URL) throws {
+    init(fileUrl: URL, minWordLength: Int) throws {
         // https://stackoverflow.com/a/62112007/1765629
         guard let filePointer:UnsafeMutablePointer<FILE> = fopen(fileUrl.path,"r") else {
             preconditionFailure("Could not open file at \(fileUrl.absoluteString)")
@@ -59,9 +59,11 @@ class JMDict {
         var bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
         
         var inEntry = false
+        var skipped = 0
         var currentEntry = 0
         var currentEntryLines = ""
         var words: [String: DictWord] = [:]
+        var symbols: Set<Character> = []
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
             let line = String.init(cString:lineByteArrayPointer!)
@@ -77,8 +79,27 @@ class JMDict {
                 // the <entry>...</entry> block
                 let entry = try JMDict.readEntry(xml: currentEntryLines)
                 for reading in entry.readings {
+                    if reading.count < minWordLength {
+                        skipped += 1
+                        continue
+                    }
+                    // @todo small kana to big kana, remove dot and other symbols
                     let hiraganed = reading.hiragana!
-                    words[hiraganed] = DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions)
+                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") {
+                        // ignore very minor symbols. They only appear in these words:
+                        // ウヰスキー whisky
+                        // スヰーデン 瑞典 Sweden
+                        // ゑびす 恵比寿 Ebisu
+                        // モワァ〜ン whoosh
+                        // あぼ〜ん deleted
+                        continue
+                    }
+                    let oomojied = hiraganed.oomoji
+                    for char in oomojied {
+                        symbols.insert(char)
+                    }
+                    // @todo if already exists, append kanji and definitions (they should be paired)
+                    words[oomojied] = DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions)
                 }
                 inEntry = false
                 currentEntry += 1
@@ -88,6 +109,9 @@ class JMDict {
             // updates number of bytes read, for the next iteration
             bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
         }
+        print("Skipped \(skipped) readings")
+        print("Symbols: ")
+        print(symbols.sorted())
         self.words = words
     }
     
@@ -122,14 +146,5 @@ class JMDict {
     
     func printStats() {
         print("#words: \(words.count)")
-        // random word sample
-        var i = 0
-        for word in words {
-            print(word)
-            i += 0
-            if i > 200 {
-                break
-            }
-        }
     }
 }
