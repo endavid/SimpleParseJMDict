@@ -24,14 +24,21 @@ struct JMDictEntry {
     let definitions: [String]
 }
 
-struct DictWord {
+struct DictWord: CustomStringConvertible {
+    var description: String {
+        get {
+            let kanjis = kanji.joined(separator: "、")
+            let defs = definitions.joined(separator: "; ")
+            return "\(reading) \(kanjis)： \(defs)"
+        }
+    }
     let reading: String
     let kanji: [String]
     let definitions: [String]
 }
 
 class JMDict {
-    let words: [String: DictWord]
+    let words: [String: [DictWord]]
     
     init(fileUrl: URL, minWordLength: Int) throws {
         // https://stackoverflow.com/a/62112007/1765629
@@ -62,7 +69,7 @@ class JMDict {
         var skipped = 0
         var currentEntry = 0
         var currentEntryLines = ""
-        var words: [String: DictWord] = [:]
+        var words: [String: [DictWord]] = [:]
         var symbols: Set<Character> = []
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
@@ -83,23 +90,25 @@ class JMDict {
                         skipped += 1
                         continue
                     }
-                    // @todo small kana to big kana, remove dot and other symbols
                     let hiraganed = reading.hiragana!
-                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") {
+                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") || hiraganed.contains("ー") {
                         // ignore very minor symbols. They only appear in these words:
                         // ウヰスキー whisky
-                        // スヰーデン 瑞典 Sweden
+                        // スヰーデン 瑞典 Sweden (not in the latest JMDict file)
                         // ゑびす 恵比寿 Ebisu
                         // モワァ〜ン whoosh
                         // あぼ〜ん deleted
+                        // んー what? https://twitter.com/endavid/status/1530241999886069761?s=20&t=mQD5FqfbAeI6x7uGhOo1VQ
+                        print("ignoring \(reading)...")
                         continue
                     }
+                    // small kana to big kana, and remove dot
                     let oomojied = hiraganed.oomoji
                     for char in oomojied {
                         symbols.insert(char)
                     }
-                    // @todo if already exists, append kanji and definitions (they should be paired)
-                    words[oomojied] = DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions)
+                    // if already exists, append kanji and definitions (they should be paired)
+                    words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions))
                 }
                 inEntry = false
                 currentEntry += 1
@@ -146,5 +155,21 @@ class JMDict {
     
     func printStats() {
         print("#words: \(words.count)")
+        var homonyms = 0
+        for word in words {
+            if word.value.count > 1 {
+                homonyms += 1
+            }
+            if word.value.count > 10 {
+                let key = word.key
+                let defs = word.value.map { $0.description.replacingOccurrences(of: key, with: "") }
+                var s = ""
+                for i in 0..<defs.count {
+                    s += "[\(i+1)] \(defs[i])\n"
+                }
+                print("\(key): \(s)")
+            }
+        }
+        print("#homonyms: \(homonyms)")
     }
 }
