@@ -18,27 +18,87 @@ enum JMDictError: LocalizedError {
     }
 }
 
+enum Dialect: String {
+    case Brazilian = "bra"
+    case Hokkaido = "hob"
+    case Kansai = "ksb"
+    case Kantou = "ktb"
+    case Kyoto = "kyb"
+    case Kyuushuu = "kyu"
+    case Nagano = "nab"
+    case Osaka = "osb"
+    case Ryuukyuu = "rkb"
+    case Touhoku = "thb"
+    case Tosa = "tsb"
+    case Tsugaru = "tsug"
+}
+
+let DialectNames: [Dialect: String] = [
+    .Brazilian: "Brazilian",
+    .Hokkaido: "Hokkaido-ben",
+    .Kansai: "Kansai-ben",
+    .Kantou: "Kantou-ben",
+    .Kyoto: "Kyoto-ben",
+    .Kyuushuu: "Kyuushuu-ben",
+    .Nagano: "Nagano-ben",
+    .Osaka: "Osaka-ben",
+    .Ryuukyuu: "Ryuukyuu-ben",
+    .Touhoku: "Touhoku-ben",
+    .Tosa: "Tosa-ben",
+    .Tsugaru: "Tsugaru-ben"
+]
+
+struct Sense: CustomStringConvertible {
+    let dialects: Set<Dialect>
+    let info: String?
+    let meanings: [String] // glosses
+    var description: String {
+        get {
+            var s = ""
+            if dialects.count > 0 {
+                s = "[" + dialects.map{$0.rawValue}.sorted().joined(separator: ",") + "] "
+            }
+            if let info = info {
+                s += "\(info). "
+            }
+            for i in 0..<meanings.count {
+                s += "(\(i)) \(meanings[i]); "
+            }
+            return s
+        }
+    }
+}
+
 struct JMDictEntry {
     let readings: [String]
     let kanji: [String]
-    let definitions: [String]
+    let senses: [Sense]
 }
 
 struct DictWord: CustomStringConvertible {
+    let reading: String
+    let kanji: [String]
+    let senses: [Sense]
+    var writing: String {
+        get {
+            if kanji.isEmpty {
+                return reading
+            }
+            return kanji.joined(separator: "、")
+        }
+    }
     var description: String {
         get {
             let kanjis = kanji.joined(separator: "、")
-            let defs = definitions.joined(separator: "; ")
-            return "\(reading) \(kanjis)： \(defs)"
+            let ss = senses.map{$0.description}.joined(separator: "; ")
+            return "\(reading) \(kanjis)： \(ss)"
         }
     }
-    let reading: String
-    let kanji: [String]
-    let definitions: [String]
 }
 
 class JMDict {
     let words: [String: [DictWord]]
+    let dialectalCount: [Dialect: Int]
     
     init(fileUrl: URL, minWordLength: Int) throws {
         // https://stackoverflow.com/a/62112007/1765629
@@ -70,6 +130,7 @@ class JMDict {
         var currentEntry = 0
         var currentEntryLines = ""
         var words: [String: [DictWord]] = [:]
+        var dialectalCount: [Dialect: Int] = [:]
         var symbols: Set<Character> = []
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
@@ -107,8 +168,13 @@ class JMDict {
                     for char in oomojied {
                         symbols.insert(char)
                     }
+                    for sense in entry.senses {
+                        for d in sense.dialects {
+                            dialectalCount[d, default: 0] += 1
+                        }
+                    }
                     // if already exists, append kanji and definitions (they should be paired)
-                    words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, definitions: entry.definitions))
+                    words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, senses: entry.senses))
                 }
                 inEntry = false
                 currentEntry += 1
@@ -122,6 +188,7 @@ class JMDict {
         print("Symbols: ")
         print(symbols.sorted())
         self.words = words
+        self.dialectalCount = dialectalCount
     }
     
     static func readEntry(xml: String) throws -> JMDictEntry {
@@ -135,11 +202,30 @@ class JMDict {
             let rebs = try captureXMLRecords(tag: "reb", in: readingElement)
             readings.append(contentsOf: rebs)
         }
-        var definitions: [String] = []
-        let senses = try captureXMLRecords(tag: "sense", in: xml)
-        for sense in senses {
-            let glosses = try captureXMLRecords(tag: "gloss", in: sense)
-            definitions.append(contentsOf: glosses)
+        var senses: [Sense] = []
+        let senseRecords = try captureXMLRecords(tag: "sense", in: xml)
+        for record in senseRecords {
+            let glosses = try captureXMLRecords(tag: "gloss", in: record)
+            let infos = try captureXMLRecords(tag: "s_info", in: record)
+            // infos max count = 1
+            if infos.count > 1 {
+                print(infos)
+            }
+            let dials = try captureXMLRecords(tag: "dial", in: record)
+            var dialects: Set<Dialect> = []
+            for dial in dials {
+                let i = dial.index(from: 1)
+                let j = dial.index(from: dial.count - 1)
+                // &hob; -> hob
+                let entity = String(dial[i..<j])
+                if let dialect = Dialect(rawValue: entity) {
+                    dialects.insert(dialect)
+                } else {
+                    print("Missing dialect: \(dial)")
+                }
+            }
+            let sense = Sense(dialects: dialects, info: infos.first, meanings: glosses)
+            senses.append(sense)
         }
         var kanji: [String] = []
         let k_eles = try captureXMLRecords(tag: "k_ele", in: xml)
@@ -150,26 +236,44 @@ class JMDict {
         // do not convert any katakana to hiragana here;
         // when doing string comparison, use .hiragana as we'd use lowercase in English
         //let hiraganed = readings.compactMap { $0.hiragana }
-        return JMDictEntry(readings: readings, kanji: kanji, definitions: definitions)
+        return JMDictEntry(readings: readings, kanji: kanji, senses: senses)
     }
     
     func printStats() {
         print("#words: \(words.count)")
         var homonyms = 0
+        var dialectalSample: [Dialect: [String]] = [:]
         for word in words {
-            if word.value.count > 1 {
+            let entry = word.value
+            if entry.count > 1 {
                 homonyms += 1
             }
-            if word.value.count > 10 {
+            if entry.count > 20 {
                 let key = word.key
-                let defs = word.value.map { $0.description.replacingOccurrences(of: key, with: "") }
+                let defs = entry.map { $0.description.replacingOccurrences(of: key, with: "") }
                 var s = ""
                 for i in 0..<defs.count {
                     s += "[\(i+1)] \(defs[i])\n"
                 }
                 print("\(key): \(s)")
             }
+            for w in entry {
+                for sense in w.senses {
+                    for d in sense.dialects {
+                        var samples = dialectalSample[d, default: []]
+                        if samples.count < 10 {
+                            samples.append(w.writing)
+                            dialectalSample[d] = samples
+                        }
+                    }
+                }
+            }
         }
         print("#homonyms: \(homonyms)")
+        for (k, v) in dialectalSample {
+            let name = DialectNames[k]!
+            let count = dialectalCount[k] ?? 0
+            print("\(name): \(count) words. E.g. " + v.joined(separator: ", "))
+        }
     }
 }
