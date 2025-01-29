@@ -48,8 +48,160 @@ let DialectNames: [Dialect: String] = [
     .Tsugaru: "Tsugaru-ben"
 ]
 
+enum Field: String {
+    case agriculture = "agric"
+    case anatomy = "anat"
+    case archeology = "archeol"
+    case architecture = "archit"
+    case art = "art" // & aesthetics
+    case astronomy = "astron"
+    case audiovisual = "audvid"
+    case aviation = "aviat"
+    case baseball = "baseb"
+    case biochemistry = "biochem"
+    case biology = "biol"
+    case botany = "bot"
+    case buddhism = "Buddh"
+    case business = "bus"
+    case chemistry = "chem"
+    case christianity = "Christn"
+    case clothing = "cloth"
+    case computing = "comp"
+    case crystallography = "cryst"
+    case ecology = "ecol"
+    case economics = "econ"
+    case electricity = "elec" // & elec. eng.
+    case electronics = "electr"
+    case embryology = "embryo"
+    case engineering = "engr"
+    case entomology = "ent"
+    case finance = "finc"
+    case fishing = "fish"
+    case food = "food"
+    case gardening = "gardn"
+    case genetics = "genet"
+    case geography = "geogr"
+    case geology = "geol"
+    case geometry = "geom"
+    case go = "go"
+    case golf = "golf"
+    case grammar = "gramm"
+    case greekMythology = "grmyth"
+    case hanafuda = "hanaf"
+    case horseRacing = "horse"
+    case law = "law"
+    case linguistics = "ling"
+    case logic = "logic"
+    case martialArts = "MA"
+    case mahjong = "mahj"
+    case mathematics = "math"
+    case mechanicalEngineering = "mech"
+    case medicine = "med"
+    case meteorology = "met"
+    case military = "mil"
+    case music = "music"
+    case ornithology = "ornith"
+    case paleontology = "paleo"
+    case pathology = "pathol"
+    case pharmacy = "pharm"
+    case philosophy = "phil"
+    case photography = "photo"
+    case physics = "physics"
+    case physiology = "physiol"
+    case printing = "print"
+    case psychiatry = "psy"
+    case psychology = "psych"
+    case railway = "rail"
+    case shinto = "Shinto"
+    case shogi = "shogi"
+    case sports = "sports"
+    case statistics = "stat"
+    case sumo = "sumo"
+    case telecommunications = "telec"
+    case trademark = "tradem"
+    case videoGames = "vidg"
+    case zoology = "zool"
+}
+
+let FieldNames: [Field: String] = [
+    .agriculture: "agriculture",
+    .anatomy: "anatomy",
+    .archeology: "archeology",
+    .architecture: "architecture",
+    .art: "art",
+    .astronomy: "astronomy",
+    .audiovisual: "audiovisual",
+    .aviation: "aviation",
+    .baseball: "baseball",
+    .biochemistry: "biochemistry",
+    .biology: "biology",
+    .botany: "botany",
+    .buddhism: "buddhism",
+    .business: "business",
+    .chemistry: "chemistry",
+    .christianity: "christianity",
+    .clothing: "clothing",
+    .computing: "computing",
+    .crystallography: "crystallography",
+    .ecology: "ecology",
+    .economics: "economics",
+    .electricity: "electricity",
+    .electronics: "electronics",
+    .embryology: "embryology",
+    .engineering: "engineering",
+    .entomology: "entomology",
+    .finance: "finance",
+    .fishing: "fishing",
+    .food: "food",
+    .gardening: "gardening",
+    .genetics: "genetics",
+    .geography: "geography",
+    .geology: "geology",
+    .geometry: "geometry",
+    .go: "go",
+    .golf: "golf",
+    .grammar: "grammar",
+    .greekMythology: "Greek Mythology",
+    .hanafuda: "hanafuda",
+    .horseRacing: "horse racing",
+    .law: "law",
+    .linguistics: "linguistics",
+    .logic: "logic",
+    .martialArts: "martial arts",
+    .mahjong: "mahjong",
+    .mathematics: "mathematics",
+    .mechanicalEngineering: "mechanical engineering",
+    .medicine: "medicine",
+    .meteorology: "meteorology",
+    .military: "military",
+    .music: "music",
+    .ornithology: "ornithology",
+    .paleontology: "paleontology",
+    .pathology: "pathology",
+    .pharmacy: "pharmacy",
+    .philosophy: "philosophy",
+    .photography: "photography",
+    .physics: "physics",
+    .physiology: "physiology",
+    .printing: "printing",
+    .psychiatry: "psychiatry",
+    .psychology: "psychology",
+    .railway: "railway",
+    .shinto: "Shinto",
+    .shogi: "shogi",
+    .sports: "sports",
+    .statistics: "statistics",
+    .sumo: "sumo",
+    .telecommunications: "telecommunications",
+    .trademark: "trademark",
+    .videoGames: "video games",
+    .zoology: "zoology"
+]
+
+
 struct Sense: CustomStringConvertible {
     let dialects: Set<Dialect>
+    let fields: Set<Field>
     let info: String?
     let meanings: [String] // glosses
     var description: String {
@@ -57,6 +209,9 @@ struct Sense: CustomStringConvertible {
             var s = ""
             if dialects.count > 0 {
                 s = "[" + dialects.map{$0.rawValue}.sorted().joined(separator: ",") + "] "
+            }
+            if fields.count > 0 {
+                s = "[" + fields.map{$0.rawValue}.sorted().joined(separator: ",") + "] "
             }
             if let info = info {
                 s += "\(info). "
@@ -96,9 +251,18 @@ struct DictWord: CustomStringConvertible {
     }
 }
 
+/// Remove 1st and last character, so &hob; -> hob
+func unentity(_ s: String) -> String {
+    let i = s.index(from: 1)
+    let j = s.index(from: s.count - 1)
+    // &hob; -> hob
+    return String(s[i..<j])
+}
+
 class JMDict {
     let words: [String: [DictWord]]
     let dialectalCount: [Dialect: Int]
+    let fieldCount: [Field: Int]
     
     init(fileUrl: URL, minWordLength: Int) throws {
         // https://stackoverflow.com/a/62112007/1765629
@@ -131,6 +295,7 @@ class JMDict {
         var currentEntryLines = ""
         var words: [String: [DictWord]] = [:]
         var dialectalCount: [Dialect: Int] = [:]
+        var fieldCount: [Field: Int] = [:]
         var symbols: Set<Character> = []
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
@@ -172,6 +337,9 @@ class JMDict {
                         for d in sense.dialects {
                             dialectalCount[d, default: 0] += 1
                         }
+                        for f in sense.fields {
+                            fieldCount[f, default: 0] += 1
+                        }
                     }
                     // if already exists, append kanji and definitions (they should be paired)
                     words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, senses: entry.senses))
@@ -186,9 +354,15 @@ class JMDict {
         }
         print("Skipped \(skipped) readings")
         print("Symbols: ")
-        print(symbols.sorted())
+        // use the ja locale for sorting so ゔ come right after う, and not after ん
+        // ref: http://endavid.com/index.php?entry=107
+        let sortedSymbols = symbols.sorted {
+            String($0).compare(String($1), options: .caseInsensitive, locale: Locale(identifier: "ja")) == .orderedAscending
+        }
+        print(sortedSymbols)
         self.words = words
         self.dialectalCount = dialectalCount
+        self.fieldCount = fieldCount
     }
     
     static func readEntry(xml: String) throws -> JMDictEntry {
@@ -204,6 +378,8 @@ class JMDict {
         }
         var senses: [Sense] = []
         let senseRecords = try captureXMLRecords(tag: "sense", in: xml)
+        var missingDialects: Set<String> = []
+        var missingFields: Set<String> = []
         for record in senseRecords {
             let glosses = try captureXMLRecords(tag: "gloss", in: record)
             let infos = try captureXMLRecords(tag: "s_info", in: record)
@@ -214,17 +390,22 @@ class JMDict {
             let dials = try captureXMLRecords(tag: "dial", in: record)
             var dialects: Set<Dialect> = []
             for dial in dials {
-                let i = dial.index(from: 1)
-                let j = dial.index(from: dial.count - 1)
-                // &hob; -> hob
-                let entity = String(dial[i..<j])
-                if let dialect = Dialect(rawValue: entity) {
+                if let dialect = Dialect(rawValue: unentity(dial)) {
                     dialects.insert(dialect)
                 } else {
-                    print("Missing dialect: \(dial)")
+                    missingDialects.insert(dial)
                 }
             }
-            let sense = Sense(dialects: dialects, info: infos.first, meanings: glosses)
+            let fieldRecords = try captureXMLRecords(tag: "field", in: record)
+            var fields: Set<Field> = []
+            for f in fieldRecords {
+                if let field = Field(rawValue: unentity(f)) {
+                    fields.insert(field)
+                } else {
+                    missingFields.insert(f)
+                }
+            }
+            let sense = Sense(dialects: dialects, fields: fields, info: infos.first, meanings: glosses)
             senses.append(sense)
         }
         var kanji: [String] = []
@@ -232,6 +413,12 @@ class JMDict {
         for k_ele in k_eles {
             let kebs = try captureXMLRecords(tag: "keb", in: k_ele)
             kanji.append(contentsOf: kebs)
+        }
+        if !missingDialects.isEmpty {
+            print("Missing dialects: \(missingDialects)")
+        }
+        if !missingFields.isEmpty {
+            print("Missing fields: \(missingFields)")
         }
         // do not convert any katakana to hiragana here;
         // when doing string comparison, use .hiragana as we'd use lowercase in English
@@ -242,7 +429,8 @@ class JMDict {
     func printStats() {
         print("#words: \(words.count)")
         var homonyms = 0
-        var dialectalSample: [Dialect: [String]] = [:]
+        var dialectalSample: [Dialect: Set<String>] = [:]
+        var fieldSample: [Field: Set<String>] = [:]
         for word in words {
             let entry = word.value
             if entry.count > 1 {
@@ -262,8 +450,15 @@ class JMDict {
                     for d in sense.dialects {
                         var samples = dialectalSample[d, default: []]
                         if samples.count < 10 {
-                            samples.append(w.writing)
+                            samples.insert(w.writing)
                             dialectalSample[d] = samples
+                        }
+                    }
+                    for f in sense.fields {
+                        var samples = fieldSample[f, default: []]
+                        if samples.count < 10 {
+                            samples.insert(w.writing)
+                            fieldSample[f] = samples
                         }
                     }
                 }
@@ -273,6 +468,12 @@ class JMDict {
         for (k, v) in dialectalSample {
             let name = DialectNames[k]!
             let count = dialectalCount[k] ?? 0
+            print("\(name): \(count) words. E.g. " + v.joined(separator: ", "))
+        }
+        print("\nFields:\n")
+        for (k, v) in fieldSample {
+            let name = FieldNames[k]!
+            let count = fieldCount[k] ?? 0
             print("\(name): \(count) words. E.g. " + v.joined(separator: ", "))
         }
     }
