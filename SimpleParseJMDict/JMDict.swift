@@ -18,7 +18,7 @@ enum JMDictError: LocalizedError {
     }
 }
 
-enum Dialect: String {
+enum Dialect: String, Codable {
     case Brazilian = "bra"
     case Hokkaido = "hob"
     case Kansai = "ksb"
@@ -48,7 +48,7 @@ let DialectNames: [Dialect: String] = [
     .Tsugaru: "Tsugaru-ben"
 ]
 
-enum Field: String {
+enum Field: String, Codable {
     case agriculture = "agric"
     case anatomy = "anat"
     case archeology = "archeol"
@@ -199,12 +199,15 @@ let FieldNames: [Field: String] = [
 ]
 
 
-struct Sense: CustomStringConvertible {
+class Sense: NSObject, Codable, NSSecureCoding {
+    static var supportsSecureCoding: Bool = true
+    
     let dialects: Set<Dialect>
     let fields: Set<Field>
     let info: String?
     let meanings: [String] // glosses
-    var description: String {
+    
+    override var description: String {
         get {
             var s = ""
             if dialects.count > 0 {
@@ -222,6 +225,30 @@ struct Sense: CustomStringConvertible {
             return s
         }
     }
+    
+    init(dialects: Set<Dialect>, fields: Set<Field>, info: String?, meanings: [String]) {
+        self.dialects = Set(dialects)
+        self.fields = Set(fields)
+        self.info = info
+        self.meanings = meanings
+    }
+
+    required convenience init?(coder: NSCoder) {
+        guard let dialects = coder.decodeObject(forKey: "dialects") as? [Dialect],
+              let fields = coder.decodeObject(forKey: "fields") as? [Field],
+              let meanings = coder.decodeObject(forKey: "meanings") as? [String] else {
+            return nil
+        }
+        let info = coder.decodeObject(forKey: "info") as? String
+        self.init(dialects: Set(dialects), fields: Set(fields), info: info, meanings: meanings)
+    }
+    
+    func encode(with coder: NSCoder) {
+        coder.encode(Array(dialects), forKey: "dialects")
+        coder.encode(Array(fields), forKey: "fields")
+        coder.encode(info, forKey: "info")
+        coder.encode(meanings, forKey: "meanings")
+    }
 }
 
 struct JMDictEntry {
@@ -230,7 +257,9 @@ struct JMDictEntry {
     let senses: [Sense]
 }
 
-struct DictWord: CustomStringConvertible {
+class DictWord: NSObject, NSSecureCoding, Codable {
+    static var supportsSecureCoding: Bool = true
+    
     let reading: String
     let kanji: [String]
     let senses: [Sense]
@@ -242,12 +271,33 @@ struct DictWord: CustomStringConvertible {
             return kanji.joined(separator: "、")
         }
     }
-    var description: String {
+    override var description: String {
         get {
             let kanjis = kanji.joined(separator: "、")
             let ss = senses.map{$0.description}.joined(separator: "; ")
             return "\(reading) \(kanjis)： \(ss)"
         }
+    }
+    
+    init(reading: String, kanji: [String], senses: [Sense]) {
+        self.reading = reading
+        self.kanji = kanji
+        self.senses = senses
+    }
+
+    required convenience init?(coder: NSCoder) {
+        guard let reading = coder.decodeObject(forKey: "reading") as? String,
+              let kanji = coder.decodeObject(forKey: "kanji") as? [String],
+              let senses = coder.decodeObject(forKey: "senses") as? [Sense] else {
+            return nil
+        }
+        self.init(reading: reading, kanji: kanji, senses: senses)
+    }
+
+    func encode(with coder: NSCoder) {
+        coder.encode(reading, forKey: "reading")
+        coder.encode(kanji, forKey: "kanji")
+        coder.encode(senses, forKey: "senses")
     }
 }
 
@@ -259,10 +309,27 @@ func unentity(_ s: String) -> String {
     return String(s[i..<j])
 }
 
-class JMDict {
+class JMDict: NSObject, Codable, NSSecureCoding {
+    static var supportsSecureCoding: Bool = true
+    
     let words: [String: [DictWord]]
     let dialectalCount: [Dialect: Int]
     let fieldCount: [Field: Int]
+    
+    init(words: [String: [DictWord]], dialectalCount: [Dialect: Int], fieldCount: [Field: Int]) {
+        self.words = words
+        self.dialectalCount = dialectalCount
+        self.fieldCount = fieldCount
+    }
+    
+    required convenience init?(coder: NSCoder) {
+        guard let words = coder.decodeObject(forKey: "words") as? [String: [DictWord]],
+              let dialectalCount = coder.decodeObject(forKey: "dialectalCount") as? [Dialect: Int],
+              let fieldCount = coder.decodeObject(forKey: "fieldCount") as? [Field: Int] else {
+            return nil
+        }
+        self.init(words: words, dialectalCount: dialectalCount, fieldCount: fieldCount)
+    }
     
     init(fileUrl: URL, minWordLength: Int) throws {
         // https://stackoverflow.com/a/62112007/1765629
@@ -363,6 +430,12 @@ class JMDict {
         self.words = words
         self.dialectalCount = dialectalCount
         self.fieldCount = fieldCount
+    }
+    
+    func encode(with coder: NSCoder) {
+        coder.encode(words, forKey: "words")
+        coder.encode(dialectalCount, forKey: "dialectalCount")
+        coder.encode(fieldCount, forKey: "fieldCount")
     }
     
     static func readEntry(xml: String) throws -> JMDictEntry {

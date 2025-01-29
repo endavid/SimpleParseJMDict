@@ -21,7 +21,7 @@ enum CLIError: LocalizedError {
     }
 }
 
-func parseCLI() throws -> JMDict {
+func parseCLI() throws -> (dict: JMDict, outPrefix: String?) {
     if CommandLine.arguments.count == 1 {
         throw CLIError.noInputFile
     }
@@ -31,5 +31,10 @@ func parseCLI() throws -> JMDict {
         throw CLIError.fileDoesNotExist(name: filename)
     }
     let fileUrl = URL(fileURLWithPath: filename)
-    return try JMDict(fileUrl: fileUrl, minWordLength: 2)
+    var outPrefix: String?
+    if CommandLine.arguments.count > 2 {
+        outPrefix = CommandLine.arguments[2]
+    }
+    let dict = try JMDict(fileUrl: fileUrl, minWordLength: 2)
+    return (dict, outPrefix)
 }

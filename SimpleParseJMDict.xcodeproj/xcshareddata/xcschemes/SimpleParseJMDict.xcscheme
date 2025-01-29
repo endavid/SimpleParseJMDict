@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
-   LastUpgradeVersion = "1220"
+   LastUpgradeVersion = "1620"
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -52,7 +52,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "/Users/david/dev/kotobanokabe/JMdict_e.xml"
+            argument = "/Users/david/dev/kotobanokabe/JMdict_e.xml /Users/david/dev/kotobanokabe/jmdict"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
