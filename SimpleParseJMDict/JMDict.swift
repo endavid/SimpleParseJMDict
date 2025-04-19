@@ -234,18 +234,22 @@ class Sense: NSObject, Codable, NSSecureCoding {
     }
 
     required convenience init?(coder: NSCoder) {
-        guard let dialects = coder.decodeObject(forKey: "dialects") as? [Dialect],
-              let fields = coder.decodeObject(forKey: "fields") as? [Field],
+        guard let dialects = coder.decodeObject(forKey: "dialects") as? [String],
+              let fields = coder.decodeObject(forKey: "fields") as? [String],
               let meanings = coder.decodeObject(forKey: "meanings") as? [String] else {
             return nil
         }
+        let ds = dialects.compactMap { Dialect(rawValue: $0) }
+        let fs = fields.compactMap { Field(rawValue: $0) }
         let info = coder.decodeObject(forKey: "info") as? String
-        self.init(dialects: Set(dialects), fields: Set(fields), info: info, meanings: meanings)
+        self.init(dialects: Set(ds), fields: Set(fs), info: info, meanings: meanings)
     }
     
     func encode(with coder: NSCoder) {
-        coder.encode(Array(dialects), forKey: "dialects")
-        coder.encode(Array(fields), forKey: "fields")
+        let ds = dialects.map { $0.rawValue }
+        let fs = fields.map { $0.rawValue }
+        coder.encode(ds, forKey: "dialects")
+        coder.encode(fs, forKey: "fields")
         coder.encode(info, forKey: "info")
         coder.encode(meanings, forKey: "meanings")
     }
@@ -324,11 +328,15 @@ class JMDict: NSObject, Codable, NSSecureCoding {
     
     required convenience init?(coder: NSCoder) {
         guard let words = coder.decodeObject(forKey: "words") as? [String: [DictWord]],
-              let dialectalCount = coder.decodeObject(forKey: "dialectalCount") as? [Dialect: Int],
-              let fieldCount = coder.decodeObject(forKey: "fieldCount") as? [Field: Int] else {
+              let dialectalCount = coder.decodeObject(forKey: "dialectalCount") as? [String: Int],
+              let fieldCount = coder.decodeObject(forKey: "fieldCount") as? [String: Int] else {
             return nil
         }
-        self.init(words: words, dialectalCount: dialectalCount, fieldCount: fieldCount)
+        var dMap: [Dialect: Int] = [:]
+        dialectalCount.forEach { dMap[Dialect(rawValue: $0.key)!] = $0.value }
+        var fMap: [Field: Int] = [:]
+        fieldCount.forEach { fMap[Field(rawValue: $0.key)!] = $0.value }
+        self.init(words: words, dialectalCount: dMap, fieldCount: fMap)
     }
     
     init(fileUrl: URL, minWordLength: Int) throws {
@@ -433,9 +441,13 @@ class JMDict: NSObject, Codable, NSSecureCoding {
     }
     
     func encode(with coder: NSCoder) {
+        var dMap: [String: Int] = [:]
+        dialectalCount.forEach { dMap[$0.key.rawValue] = $0.value }
+        var fMap: [String: Int] = [:]
+        fieldCount.forEach { fMap[$0.key.rawValue] = $0.value }
         coder.encode(words, forKey: "words")
-        coder.encode(dialectalCount, forKey: "dialectalCount")
-        coder.encode(fieldCount, forKey: "fieldCount")
+        coder.encode(dMap, forKey: "dialectalCount")
+        coder.encode(fMap, forKey: "fieldCount")
     }
     
     static func readEntry(xml: String) throws -> JMDictEntry {

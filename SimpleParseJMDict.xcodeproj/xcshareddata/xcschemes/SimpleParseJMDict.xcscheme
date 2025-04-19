@@ -52,7 +52,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "/Users/david/dev/kotobanokabe/JMdict_e.xml /Users/david/dev/kotobanokabe/jmdict"
+            argument = "/Users/david/dev/jdict/JMdict_e.xml /Users/david/dev/jdict/jmdict"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
