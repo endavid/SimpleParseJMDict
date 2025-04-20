@@ -220,7 +220,7 @@ class Sense: NSObject, Codable, NSSecureCoding {
                 s += "\(info). "
             }
             for i in 0..<meanings.count {
-                s += "(\(i)) \(meanings[i]); "
+                s += "(\(i+1)) \(meanings[i]); "
             }
             return s
         }
@@ -259,6 +259,29 @@ struct JMDictEntry {
     let readings: [String]
     let kanji: [String]
     let senses: [Sense]
+    
+    func removeDuplicateReadings() -> JMDictEntry {
+        let existing = Set(readings)
+        var minSet = [String]()
+        for r in readings {
+            if r.contains("・") {
+                let s = r.replacingOccurrences(of: "・", with: "")
+                if existing.contains(s) {
+                    // prefer アヴェマリア over アヴェ・マリア
+                    continue
+                }
+            }
+            let katakana = r.kana
+            if existing.contains(katakana) && r != katakana {
+                // prefer シュー over しゅー
+                // but also グッタリ over ぐったり because I don't have any other way to tell which spelling is preferred and I'm trying to prune some data.
+                print("Skipping reading: \(r) -> \(katakana)")
+                continue
+            }
+            minSet.append(r)
+        }
+        return JMDictEntry(readings: minSet, kanji: kanji, senses: senses)
+    }
 }
 
 class DictWord: NSObject, NSSecureCoding, Codable {
@@ -391,15 +414,16 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                         skipped += 1
                         continue
                     }
-                    let hiraganed = reading.hiragana!
-                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") || hiraganed.contains("ー") {
+                    let hiraganed = reading.hiragana
+                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") {
                         // ignore very minor symbols. They only appear in these words:
                         // ウヰスキー whisky
                         // スヰーデン 瑞典 Sweden (not in the latest JMDict file)
                         // ゑびす 恵比寿 Ebisu
                         // モワァ〜ン whoosh
                         // あぼ〜ん deleted
-                        // んー what? https://twitter.com/endavid/status/1530241999886069761?s=20&t=mQD5FqfbAeI6x7uGhOo1VQ
+                        // https://twitter.com/endavid/status/1530241999886069761?s=20&t=mQD5FqfbAeI6x7uGhOo1VQ
+                        // should I also skip "んー what?" ??
                         print("ignoring \(reading)...")
                         continue
                     }
@@ -427,7 +451,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
             // updates number of bytes read, for the next iteration
             bytesRead = getline(&lineByteArrayPointer, &lineCap, filePointer)
         }
-        print("Skipped \(skipped) readings")
+        print("Skipped \(skipped) readings shorter than \(minWordLength)")
         print("Symbols: ")
         // use the ja locale for sorting so ゔ come right after う, and not after ん
         // ref: http://endavid.com/index.php?entry=107
@@ -508,7 +532,8 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         // do not convert any katakana to hiragana here;
         // when doing string comparison, use .hiragana as we'd use lowercase in English
         //let hiraganed = readings.compactMap { $0.hiragana }
-        return JMDictEntry(readings: readings, kanji: kanji, senses: senses)
+        let entry = JMDictEntry(readings: readings, kanji: kanji, senses: senses)
+        return entry.removeDuplicateReadings()
     }
     
     func printStats() {

@@ -63,11 +63,16 @@ extension String {
     }
     
     // https://www.egao-inc.co.jp/programming/swift_recipe7/
-    var kana: String? {
-        return self.applyingTransform(.hiraganaToKatakana, reverse: false)
+    var kana: String {
+        return self.applyingTransform(.hiraganaToKatakana, reverse: false)!
     }
-    var hiragana: String? {
-        return self.applyingTransform(.hiraganaToKatakana, reverse: true)
+    var hiragana: String {
+        // we want to keep the ー !!
+        // .hiraganaToKatakana transforms シュー into しゅう, but I want しゅー actually...
+        // so small trick is to replace ー by another symbol...
+        var s = self.replacingOccurrences(of: "ー", with: "＊")
+        s = s.applyingTransform(.hiraganaToKatakana, reverse: true)!
+        return s.replacingOccurrences(of: "＊", with: "ー")
     }
     var oomoji: String {
         // ["〜", "ぁ", "あ", "ぃ", "い", "ぅ", "う", "ぇ", "え", "ぉ", "お", "か", "が", "き", "ぎ", "く", "ぐ", "け", "げ", "こ", "ご", "さ", "ざ", "し", "じ", "す", "ず", "せ", "ぜ", "そ", "ぞ", "た", "だ", "ち", "ぢ", "っ", "つ", "づ", "て", "で", "と", "ど", "な", "に", "ぬ", "ね", "の", "は", "ば", "ぱ", "ひ", "び", "ぴ", "ふ", "ぶ", "ぷ", "へ", "べ", "ぺ", "ほ", "ぼ", "ぽ", "ま", "み", "む", "め", "も", "ゃ", "や", "ゅ", "ゆ", "ょ", "よ", "ら", "り", "る", "れ", "ろ", "ゎ", "わ", "ゐ", "ゑ", "を", "ん", "ゔ", "・"]
