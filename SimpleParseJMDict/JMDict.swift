@@ -536,7 +536,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         for (r, restr) in readings {
             // アッというまに -> あっというまに, メダルゲーム -> めだるげーむ
             let reading = r.hiragana
-            readingsH[reading] = readingsH[r, default: []].union(Set(restr))
+            readingsH[reading] = readingsH[reading, default: []].union(Set(restr))
         }
         
         if !missingDialects.isEmpty {
