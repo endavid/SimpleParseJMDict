@@ -130,3 +130,7 @@ func captureXMLRecords(tag: String, in line: String) throws -> [String] {
     }
     return matches
 }
+
+func jaIncreasingOrder(_ a: String, _ b: String) -> Bool {
+    return a.compare(b, options: .caseInsensitive, locale: Locale(identifier: "ja")) == .orderedAscending
+}

@@ -19,12 +19,18 @@ func saveArchive(obj: NSObject, outURL: URL) throws {
     try data.write(to: outURL)
 }
 
+func saveLines(_ lines: [String], outURL: URL) throws {
+    let s = lines.joined(separator: "\n")
+    try s.write(to: outURL, atomically: true, encoding: .utf8)
+}
+
 func main() {
     do {
         let (jmDict, outPrefix) = try parseCLI()
         if let outPrefix {
             try saveJSON(codable: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).json"))
             try saveArchive(obj: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).archive"))
+            try saveLines(jmDict.sortedKeys(), outURL: URL(fileURLWithPath: "\(outPrefix)-keys.txt"))
         }
         jmDict.printStats()
     } catch {
