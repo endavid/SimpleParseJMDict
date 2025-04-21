@@ -31,6 +31,7 @@ func main() {
             try saveJSON(codable: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).json"))
             try saveArchive(obj: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).archive"))
             try saveLines(jmDict.sortedKeys(), outURL: URL(fileURLWithPath: "\(outPrefix)-keys.txt"))
+            try saveLines(jmDict.flattenDictionary(), outURL: URL(fileURLWithPath: "\(outPrefix)-dict.txt"))
         }
         jmDict.printStats()
     } catch {

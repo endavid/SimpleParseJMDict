@@ -210,6 +210,15 @@ class Sense: NSObject, Codable, NSSecureCoding {
     let info: String?
     let meanings: [String] // glosses
     
+    var meaningList: String {
+        get {
+            let all = (0..<meanings.count).map {
+                "(\($0 + 1)) \(meanings[$0])"
+            }
+            return all.joined(separator: "; ")
+        }
+    }
+    
     override var description: String {
         get {
             var s = ""
@@ -222,9 +231,7 @@ class Sense: NSObject, Codable, NSSecureCoding {
             if let info = info {
                 s += "\(info). "
             }
-            for i in 0..<meanings.count {
-                s += "(\(i+1)) \(meanings[i]); "
-            }
+            s += meaningList
             return s
         }
     }
@@ -281,8 +288,18 @@ class DictWord: NSObject, NSSecureCoding, Codable {
     override var description: String {
         get {
             let kanjis = kanji.joined(separator: "、")
-            let ss = senses.map{$0.description}.joined(separator: "; ")
+            let ss = senses.map{$0.description}.joined(separator: "&& ")
             return "\(reading) \(kanjis)： \(ss)"
+        }
+    }
+    var dictionaryDescription: String {
+        get {
+            let kanjis = kanji.joined(separator: "、")
+            let ss = senses.map{$0.meaningList}.joined(separator: "; ")
+            if kanjis.isEmpty {
+                return ss
+            }
+            return "\(kanjis) ## \(ss)"
         }
     }
     
@@ -458,6 +475,26 @@ class JMDict: NSObject, Codable, NSSecureCoding {
     
     func sortedKeys() -> [String] {
         return words.keys.sorted(by: jaIncreasingOrder)
+    }
+    
+    func flattenDictionary() -> [String] {
+        let keys = sortedKeys()
+        var lines: [String] = []
+        for key in keys {
+            let list = words[key]!
+            // group by reading, because the key しよう could correspond to both しょう and しよう
+            var grouped: [String: [DictWord]] = [:]
+            for w in list {
+                grouped[w.reading, default: []].append(w)
+            }
+            var readings: [String] = []
+            for (r, wlist) in grouped {
+                let defs = wlist.map { $0.dictionaryDescription }.sorted(by: jaIncreasingOrder)
+                readings.append("【\(r)】" + defs.joined(separator: " // ") )
+            }
+            lines.append("\(key): " + readings.joined(separator: " || "))
+        }
+        return lines
     }
     
     /**
