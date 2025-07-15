@@ -201,12 +201,127 @@ let FieldNames: [Field: String] = [
     .zoology: "zoology"
 ]
 
+enum MiscTag: String, Codable {
+    case abbr = "abbr"
+    case arch = "arch"
+    case char = "char"
+    case chn = "chn"
+    case col = "col"
+    case company = "company"
+    case creat = "creat"
+    case dated = "dated"
+    case dei = "dei"
+    case derog = "derog"
+    case doc = "doc"
+    case ev = "ev"
+    case fam = "fam"
+    case fem = "fem"
+    case fict = "fict"
+    case form = "form"
+    case given = "given"
+    case group = "group"
+    case hist = "hist"
+    case hon = "hon"
+    case hum = "hum"
+    case id = "id"
+    case joc = "joc"
+    case leg = "leg"
+    case m_sl = "m-sl"
+    case male = "male"
+    case myth = "myth"
+    case net_sl = "net-sl"
+    case obj = "obj"
+    case obs = "obs"
+    case obsc = "obsc"
+    case on_mim = "on-mim"
+    case organization = "organization"
+    case oth = "oth"
+    case person = "person"
+    case place = "place"
+    case poet = "poet"
+    case pol = "pol"
+    case product = "product"
+    case proverb = "proverb"
+    case quote = "quote"
+    case rare = "rare"
+    case relig = "relig"
+    case sens = "sens"
+    case serv = "serv"
+    case sl = "sl"
+    case station = "station"
+    case surname = "surname"
+    case uk = "uk"
+    case unclass = "unclass"
+    case vulg = "vulg"
+    case work = "work"
+    case x = "X"
+    case yoji = "yoji"
+}
+
+let MiscDescription: [MiscTag: String] = [
+    .abbr: "abbreviation",
+    .arch: "archaism",
+    .char: "character",
+    .chn: "children's language",
+    .col: "colloquialism",
+    .company: "company name",
+    .creat: "creature",
+    .dated: "dated term",
+    .dei: "deity",
+    .derog: "derogatory",
+    .doc: "document",
+    .ev: "event",
+    .fam: "familiar language",
+    .fem: "female term or language",
+    .fict: "fiction",
+    .form: "formal or literary term",
+    .given: "given name or forename, gender not specified",
+    .group: "group",
+    .hist: "historical term",
+    .hon: "honorific or respectful (sonkeigo) language",
+    .hum: "humble (kenjougo) language",
+    .id: "idiomatic expression",
+    .joc: "jocular, humorous term",
+    .leg: "legend",
+    .m_sl: "manga slang",
+    .male: "male term or language",
+    .myth: "mythology",
+    .net_sl: "Internet slang",
+    .obj: "object",
+    .obs: "obsolete term",
+    .obsc: "obscure term",
+    .on_mim: "onomatopoeic or mimetic word",
+    .organization: "organization name",
+    .oth: "other",
+    .person: "full name of a particular person",
+    .place: "place name",
+    .poet: "poetical term",
+    .pol: "polite (teineigo) language",
+    .product: "product name",
+    .proverb: "proverb",
+    .quote: "quotation",
+    .rare: "rare",
+    .relig: "religion",
+    .sens: "sensitive",
+    .serv: "service",
+    .sl: "slang",
+    .station: "railway station",
+    .surname: "family or surname",
+    .uk: "word usually written using kana alone",
+    .unclass: "unclassified name",
+    .vulg: "vulgar expression or word",
+    .work: "work of art, literature, music, etc. name",
+    .x: "rude or X-rated term (not displayed in educational software)",
+    .yoji: "yojijukugo"
+]
+
 
 class Sense: NSObject, Codable, NSSecureCoding {
     static var supportsSecureCoding: Bool = true
     
     let dialects: Set<Dialect>
     let fields: Set<Field>
+    let misc: Set<MiscTag>
     let info: String?
     let meanings: [String] // glosses
     
@@ -236,9 +351,10 @@ class Sense: NSObject, Codable, NSSecureCoding {
         }
     }
     
-    init(dialects: Set<Dialect>, fields: Set<Field>, info: String?, meanings: [String]) {
+    init(dialects: Set<Dialect>, fields: Set<Field>, misc: Set<MiscTag>, info: String?, meanings: [String]) {
         self.dialects = Set(dialects)
         self.fields = Set(fields)
+        self.misc = Set(misc)
         self.info = info
         self.meanings = meanings
     }
@@ -246,13 +362,15 @@ class Sense: NSObject, Codable, NSSecureCoding {
     required convenience init?(coder: NSCoder) {
         guard let dialects = coder.decodeObject(forKey: "dialects") as? [String],
               let fields = coder.decodeObject(forKey: "fields") as? [String],
+              let misc = coder.decodeObject(forKey: "misc") as? [String],
               let meanings = coder.decodeObject(forKey: "meanings") as? [String] else {
             return nil
         }
         let ds = dialects.compactMap { Dialect(rawValue: $0) }
         let fs = fields.compactMap { Field(rawValue: $0) }
+        let ms = misc.compactMap { MiscTag(rawValue: $0) }
         let info = coder.decodeObject(forKey: "info") as? String
-        self.init(dialects: Set(ds), fields: Set(fs), info: info, meanings: meanings)
+        self.init(dialects: Set(ds), fields: Set(fs), misc: Set(ms), info: info, meanings: meanings)
     }
     
     func encode(with coder: NSCoder) {
@@ -339,24 +457,28 @@ class JMDict: NSObject, Codable, NSSecureCoding {
     let words: [String: [DictWord]]
     let dialectalCount: [Dialect: Int]
     let fieldCount: [Field: Int]
+    let miscCount: [MiscTag: Int]
     
-    init(words: [String: [DictWord]], dialectalCount: [Dialect: Int], fieldCount: [Field: Int]) {
+    init(words: [String: [DictWord]], dialectalCount: [Dialect: Int], fieldCount: [Field: Int], miscCount: [MiscTag: Int]) {
         self.words = words
         self.dialectalCount = dialectalCount
         self.fieldCount = fieldCount
+        self.miscCount = miscCount
     }
     
     required convenience init?(coder: NSCoder) {
         guard let words = coder.decodeObject(forKey: "words") as? [String: [DictWord]],
               let dialectalCount = coder.decodeObject(forKey: "dialectalCount") as? [String: Int],
-              let fieldCount = coder.decodeObject(forKey: "fieldCount") as? [String: Int] else {
+              let fieldCount = coder.decodeObject(forKey: "fieldCount") as? [String: Int], let miscCount = coder.decodeObject(forKey: "miscCount") as? [String: Int] else {
             return nil
         }
         var dMap: [Dialect: Int] = [:]
         dialectalCount.forEach { dMap[Dialect(rawValue: $0.key)!] = $0.value }
         var fMap: [Field: Int] = [:]
         fieldCount.forEach { fMap[Field(rawValue: $0.key)!] = $0.value }
-        self.init(words: words, dialectalCount: dMap, fieldCount: fMap)
+        var mMap: [MiscTag: Int] = [:]
+        miscCount.forEach { mMap[MiscTag(rawValue: $0.key)!] = $0.value }
+        self.init(words: words, dialectalCount: dMap, fieldCount: fMap, miscCount: mMap)
     }
     
     init(fileUrl: URL, minWordLength: Int) throws {
@@ -391,6 +513,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         var words: [String: [DictWord]] = [:]
         var dialectalCount: [Dialect: Int] = [:]
         var fieldCount: [Field: Int] = [:]
+        var miscCount: [MiscTag: Int] = [:]
         var symbols: Set<Character> = []
         while (bytesRead > 0) {
             // note: this translates the sequence of bytes to a string using UTF-8 interpretation
@@ -437,6 +560,9 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                         for f in sense.fields {
                             fieldCount[f, default: 0] += 1
                         }
+                        for m in sense.misc {
+                            miscCount[m, default: 0] += 1
+                        }
                     }
                     if entry.kanji.count == 1 && reading.katakana == entry.kanji.first {
                         // use katakana for the reading for katakana words (single reading, no kanji)
@@ -465,6 +591,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         self.words = words
         self.dialectalCount = dialectalCount
         self.fieldCount = fieldCount
+        self.miscCount = miscCount
     }
     
     func encode(with coder: NSCoder) {
@@ -472,9 +599,12 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         dialectalCount.forEach { dMap[$0.key.rawValue] = $0.value }
         var fMap: [String: Int] = [:]
         fieldCount.forEach { fMap[$0.key.rawValue] = $0.value }
+        var mMap: [String: Int] = [:]
+        miscCount.forEach { mMap[$0.key.rawValue] = $0.value }
         coder.encode(words, forKey: "words")
         coder.encode(dMap, forKey: "dialectalCount")
         coder.encode(fMap, forKey: "fieldCount")
+        coder.encode(mMap, forKey: "miscCount")
     }
     
     func sortedKeys() -> [String] {
@@ -535,6 +665,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         let senseRecords = try captureXMLRecords(tag: "sense", in: xml)
         var missingDialects: Set<String> = []
         var missingFields: Set<String> = []
+        var missingMisc: Set<String> = []
         for record in senseRecords {
             let glosses = try captureXMLRecords(tag: "gloss", in: record)
             let infos = try captureXMLRecords(tag: "s_info", in: record)
@@ -560,15 +691,16 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                     missingFields.insert(f)
                 }
             }
-            #if false
             let miscRecords = try captureXMLRecords(tag: "misc", in: record)
-            if !miscRecords.isEmpty {
-                if miscRecords.contains("&vulg;") {
-                    print("\(readings) \(miscRecords)")
+            var misc: Set<MiscTag> = []
+            for m in miscRecords {
+                if let tag = MiscTag(rawValue: unentity(m)) {
+                    misc.insert(tag)
+                } else {
+                    missingMisc.insert(m)
                 }
             }
-            #endif
-            let sense = Sense(dialects: dialects, fields: fields, info: infos.first, meanings: glosses)
+            let sense = Sense(dialects: dialects, fields: fields, misc: misc, info: infos.first, meanings: glosses)
             senses.append(sense)
         }
         var kanji: [String] = []
@@ -603,6 +735,9 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         if !missingFields.isEmpty {
             print("Missing fields: \(missingFields)")
         }
+        if !missingMisc.isEmpty {
+            print("Missing misc: \(missingMisc)")
+        }
         // readingsH are all in hiragana, but the kanji list contains the katakana as well
         var entries: [JMDictEntry] = []
         for (r, restr) in readingsH {
@@ -616,6 +751,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         var homonyms = 0
         var dialectalSample: [Dialect: Set<String>] = [:]
         var fieldSample: [Field: Set<String>] = [:]
+        var miscSample: [MiscTag: Set<String>] = [:]
         for word in words {
             let entry = word.value
             if entry.count > 1 {
@@ -646,6 +782,13 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                             fieldSample[f] = samples
                         }
                     }
+                    for m in sense.misc {
+                        var samples = miscSample[m, default: []]
+                        if samples.count < 10 {
+                            samples.insert(w.writing)
+                            miscSample[m] = samples
+                        }
+                    }
                 }
             }
         }
@@ -659,6 +802,12 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         for (k, v) in fieldSample {
             let name = FieldNames[k]!
             let count = fieldCount[k] ?? 0
+            print("\(name): \(count) words. E.g. " + v.joined(separator: ", "))
+        }
+        print("\nMisc:\n")
+        for (k, v) in miscSample {
+            let name = MiscDescription[k]!
+            let count = miscCount[k] ?? 0
             print("\(name): \(count) words. E.g. " + v.joined(separator: ", "))
         }
     }
