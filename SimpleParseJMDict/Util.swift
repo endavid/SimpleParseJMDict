@@ -63,7 +63,7 @@ extension String {
     }
     
     // https://www.egao-inc.co.jp/programming/swift_recipe7/
-    var kana: String {
+    var katakana: String {
         return self.applyingTransform(.hiraganaToKatakana, reverse: false)!
     }
     var hiragana: String {

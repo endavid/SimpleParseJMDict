@@ -266,7 +266,7 @@ class Sense: NSObject, Codable, NSSecureCoding {
 }
 
 struct JMDictEntry {
-    let readings: [String]
+    let reading: String
     let kanji: [String]
     let senses: [Sense]
 }
@@ -407,38 +407,42 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                 // the <entry>...</entry> block
                 let entries = try JMDict.readEntry(xml: currentEntryLines)
                 for entry in entries {
-                    for reading in entry.readings {
-                        if reading.count < minWordLength {
-                            skipped += 1
-                            continue
+                    let reading = entry.reading
+                    if reading.count < minWordLength {
+                        skipped += 1
+                        continue
+                    }
+                    let hiraganed = reading.hiragana
+                    if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") {
+                        // ignore very minor symbols. They only appear in these words:
+                        // ウヰスキー whisky
+                        // スヰーデン 瑞典 Sweden (not in the latest JMDict file)
+                        // ゑびす 恵比寿 Ebisu
+                        // モワァ〜ン whoosh
+                        // あぼ〜ん deleted
+                        // https://twitter.com/endavid/status/1530241999886069761?s=20&t=mQD5FqfbAeI6x7uGhOo1VQ
+                        // should I also skip "んー what?" ??
+                        print("ignoring \(reading)...")
+                        continue
+                    }
+                    // small kana to big kana, and remove dot
+                    let oomojied = hiraganed.oomoji
+                    for char in oomojied {
+                        symbols.insert(char)
+                    }
+                    for sense in entry.senses {
+                        for d in sense.dialects {
+                            dialectalCount[d, default: 0] += 1
                         }
-                        let hiraganed = reading.hiragana
-                        if hiraganed.contains("ゐ") || hiraganed.contains("ゑ") || hiraganed.contains("〜") {
-                            // ignore very minor symbols. They only appear in these words:
-                            // ウヰスキー whisky
-                            // スヰーデン 瑞典 Sweden (not in the latest JMDict file)
-                            // ゑびす 恵比寿 Ebisu
-                            // モワァ〜ン whoosh
-                            // あぼ〜ん deleted
-                            // https://twitter.com/endavid/status/1530241999886069761?s=20&t=mQD5FqfbAeI6x7uGhOo1VQ
-                            // should I also skip "んー what?" ??
-                            print("ignoring \(reading)...")
-                            continue
+                        for f in sense.fields {
+                            fieldCount[f, default: 0] += 1
                         }
-                        // small kana to big kana, and remove dot
-                        let oomojied = hiraganed.oomoji
-                        for char in oomojied {
-                            symbols.insert(char)
-                        }
-                        for sense in entry.senses {
-                            for d in sense.dialects {
-                                dialectalCount[d, default: 0] += 1
-                            }
-                            for f in sense.fields {
-                                fieldCount[f, default: 0] += 1
-                            }
-                        }
-                        // if already exists, append kanji and definitions (they should be paired)
+                    }
+                    if entry.kanji.count == 1 && reading.katakana == entry.kanji.first {
+                        // use katakana for the reading for katakana words (single reading, no kanji)
+                        words[oomojied, default: []].append(DictWord(reading: entry.kanji.first!, kanji: [], senses: entry.senses))
+                    } else {
+                        // we use append because there could be words sounding the same
                         words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, senses: entry.senses))
                     }
                 }
@@ -507,18 +511,23 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         var readings: [String: Set<String>] = [:]
         let eles = try captureXMLRecords(tag: "r_ele", in: xml)
         for readingElement in eles {
-            if readingElement.contains("re_nokanji") {
-                // not the true reading of the kanji; skip
-                continue
-            }
             let rebs = try captureXMLRecords(tag: "reb", in: readingElement)
             if rebs.count > 1 {
                 throw JMDictError.expectedSingle(tag: "reb", word: rebs.first!)
             }
-            let restr = try captureXMLRecords(tag: "re_restr", in: readingElement)
-            if let r = rebs.first {
+            guard let r = rebs.first else {
+                continue
+            }
+            let reading = r.replacingOccurrences(of: "・", with: "")
+            if readingElement.contains("re_nokanji") {
+                // not the true reading of the kanji
+                // but if it's katakana, remember it
+                if reading.hiragana != reading {
+                    readings[reading] = readings[r, default: []].union([r])
+                }
+            } else {
+                let restr = try captureXMLRecords(tag: "re_restr", in: readingElement)
                 // メダル・ゲーム -> メダルゲーム
-                let reading = r.replacingOccurrences(of: "・", with: "")
                 readings[reading] = readings[r, default: []].union(Set(restr))
             }
         }
@@ -551,6 +560,14 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                     missingFields.insert(f)
                 }
             }
+            #if false
+            let miscRecords = try captureXMLRecords(tag: "misc", in: record)
+            if !miscRecords.isEmpty {
+                if miscRecords.contains("&vulg;") {
+                    print("\(readings) \(miscRecords)")
+                }
+            }
+            #endif
             let sense = Sense(dialects: dialects, fields: fields, info: infos.first, meanings: glosses)
             senses.append(sense)
         }
@@ -565,6 +582,10 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         for (r, restr) in readings {
             if restr.isEmpty {
                 readings[r] = Set(kanji)
+                if r.hiragana != r {
+                    // we treat katakana as kanji, because the reading will always be in hiragana
+                    readings[r]?.insert(r)
+                }
             }
         }
         // now convert the readings to hiragana, with the full set
@@ -582,14 +603,10 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         if !missingFields.isEmpty {
             print("Missing fields: \(missingFields)")
         }
-        
-        // do not convert any katakana to hiragana here;
-        // when doing string comparison, use .hiragana as we'd use lowercase in English
-        //let hiraganed = readings.compactMap { $0.hiragana }
-        
+        // readingsH are all in hiragana, but the kanji list contains the katakana as well
         var entries: [JMDictEntry] = []
         for (r, restr) in readingsH {
-            entries.append(JMDictEntry(readings: [r], kanji: restr.sorted(by: jaIncreasingOrder), senses: senses))
+            entries.append(JMDictEntry(reading: r, kanji: restr.sorted(by: jaIncreasingOrder), senses: senses))
         }
         return entries
     }
