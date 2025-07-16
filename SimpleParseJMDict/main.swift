@@ -30,9 +30,15 @@ func main() {
         if let outPrefix {
             try saveJSON(codable: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).json"))
             try saveArchive(obj: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).archive"))
-            try saveLines(jmDict.sortedKeys(), outURL: URL(fileURLWithPath: "\(outPrefix)-keys.txt"))
-            try saveLines(jmDict.flattenDictionary(), outURL: URL(fileURLWithPath: "\(outPrefix)-dict.txt"))
+            try saveLines(jmDict.sortedKeys(), outURL: URL(fileURLWithPath: "\(outPrefix)-keysAll.txt"))
+            try saveLines(jmDict.flattenDictionary(), outURL: URL(fileURLWithPath: "\(outPrefix)-dictAll.txt"))
             try saveLines(jmDict.flattenDictionary(senseFilter: {$0.misc.contains(.vulg)}), outURL: URL(fileURLWithPath: "\(outPrefix)-vulgar.txt"))
+            let goodDict = jmDict.dictionaryWithoutUselessWords()
+            let keys = goodDict.sortedKeys()
+            try saveLines(keys, outURL: URL(fileURLWithPath: "\(outPrefix)-keys.txt"))
+            try saveLines(goodDict.flattenDictionary(), outURL: URL(fileURLWithPath: "\(outPrefix)-dict.txt"))
+            let keysMin3 = keys.filter { $0.count >= 3 && $0.count <= 12 }
+            try saveLines(keysMin3, outURL: URL(fileURLWithPath: "\(outPrefix)-keys3.txt"))
         }
         jmDict.printStats()
     } catch {

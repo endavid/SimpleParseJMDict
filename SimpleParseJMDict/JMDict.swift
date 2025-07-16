@@ -327,10 +327,7 @@ class Sense: NSObject, Codable, NSSecureCoding {
     
     var meaningList: String {
         get {
-            let all = (0..<meanings.count).map {
-                "(\($0 + 1)) \(meanings[$0])"
-            }
-            return all.joined(separator: "; ")
+            return meanings.joined(separator: "; ")
         }
     }
     
@@ -472,6 +469,31 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         self.dialectalCount = dialectalCount
         self.fieldCount = fieldCount
         self.miscCount = miscCount
+    }
+    
+    init(words: [String: [DictWord]]) {
+        self.words = words
+        var dCount: [Dialect: Int] = [:]
+        var fCount: [Field: Int] = [:]
+        var mCount: [MiscTag: Int] = [:]
+        for (_, dwords) in words {
+            for dw in dwords {
+                for s in dw.senses {
+                    for d in s.dialects {
+                        dCount[d, default: 0] += 1
+                    }
+                    for f in s.fields {
+                        fCount[f, default: 0] += 1
+                    }
+                    for m in s.misc {
+                        mCount[m, default: 0] += 1
+                    }
+                }
+            }
+        }
+        self.dialectalCount = dCount
+        self.fieldCount = fCount
+        self.miscCount = mCount
     }
     
     required convenience init?(coder: NSCoder) {
@@ -645,6 +667,71 @@ class JMDict: NSObject, Codable, NSSecureCoding {
             }
         }
         return lines
+    }
+
+    static func goodSense(_ s: Sense) -> Bool {
+        if !s.dialects.isEmpty {
+            return false
+        }
+        let miscNG: Set<MiscTag> = [
+            .abbr,
+            .arch,
+            .char,
+            .chn,
+            .col,
+            .company,
+            .creat,
+            .dated,
+            .dei,
+            .derog,
+            .doc,
+            .ev,
+            .fict,
+            .given,
+            .group,
+            .hist,
+            .joc,
+            .leg,
+            .m_sl,
+            .myth,
+            .net_sl,
+            .obj,
+            .obs,
+            .obsc,
+            .oth,
+            .person,
+            .place,
+            .poet,
+            .product,
+            .proverb,
+            .quote,
+            .rare,
+            .relig,
+            .sens,
+            .serv,
+            .sl,
+            .station,
+            .surname,
+            .unclass,
+            .vulg,
+            .work,
+            .x
+        ]
+        if !s.misc.intersection(miscNG).isEmpty {
+            return false
+        }
+        return true
+    }
+    
+    func dictionaryWithoutUselessWords() -> JMDict {
+        var filteredWords: [String: [DictWord]] = [:]
+        for (key, wlist) in words {
+            let dictWords = wlist.compactMap { $0.filterBySense(using: JMDict.goodSense) }
+            if !dictWords.isEmpty {
+                filteredWords[key] = dictWords
+            }
+        }
+        return JMDict(words: filteredWords)
     }
     
     /**
