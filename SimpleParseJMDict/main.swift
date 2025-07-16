@@ -32,6 +32,7 @@ func main() {
             try saveArchive(obj: jmDict, outURL: URL(fileURLWithPath: "\(outPrefix).archive"))
             try saveLines(jmDict.sortedKeys(), outURL: URL(fileURLWithPath: "\(outPrefix)-keys.txt"))
             try saveLines(jmDict.flattenDictionary(), outURL: URL(fileURLWithPath: "\(outPrefix)-dict.txt"))
+            try saveLines(jmDict.flattenDictionary(senseFilter: {$0.misc.contains(.vulg)}), outURL: URL(fileURLWithPath: "\(outPrefix)-vulgar.txt"))
         }
         jmDict.printStats()
     } catch {

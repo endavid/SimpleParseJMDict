@@ -441,6 +441,14 @@ class DictWord: NSObject, NSSecureCoding, Codable {
         coder.encode(kanji, forKey: "kanji")
         coder.encode(senses, forKey: "senses")
     }
+    
+    func filterBySense(using closure: (Sense) -> Bool) -> DictWord? {
+        let filtered = senses.filter(closure)
+        if filtered.isEmpty {
+            return nil
+        }
+        return DictWord(reading: reading, kanji: kanji, senses: filtered)
+    }
 }
 
 /// Remove 1st and last character, so &hob; -> hob
@@ -611,7 +619,7 @@ class JMDict: NSObject, Codable, NSSecureCoding {
         return words.keys.sorted(by: jaIncreasingOrder)
     }
     
-    func flattenDictionary() -> [String] {
+    func flattenDictionary(senseFilter: ((Sense) -> Bool)? = nil) -> [String] {
         let keys = sortedKeys()
         var lines: [String] = []
         for key in keys {
@@ -623,10 +631,18 @@ class JMDict: NSObject, Codable, NSSecureCoding {
             }
             var readings: [String] = []
             for (r, wlist) in grouped {
-                let defs = wlist.map { $0.dictionaryDescription }.sorted(by: jaIncreasingOrder)
-                readings.append("【\(r)】" + defs.joined(separator: " // ") )
+                var dictWords = wlist
+                if let f = senseFilter {
+                    dictWords = wlist.compactMap { $0.filterBySense(using: f) }
+                }
+                if !dictWords.isEmpty {
+                    let defs = dictWords.map { $0.dictionaryDescription }.sorted(by: jaIncreasingOrder)
+                    readings.append("【\(r)】" + defs.joined(separator: " // ") )
+                }
             }
-            lines.append("\(key): " + readings.joined(separator: " || "))
+            if !readings.isEmpty {
+                lines.append("\(key): " + readings.joined(separator: " || "))
+            }
         }
         return lines
     }
