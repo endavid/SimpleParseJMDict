@@ -598,8 +598,22 @@ class JMDict: NSObject, Codable, NSSecureCoding {
                         // use katakana for the reading for katakana words (single reading, no kanji)
                         words[oomojied, default: []].append(DictWord(reading: entry.kanji.first!, kanji: [], senses: entry.senses))
                     } else {
+                        var bestReading = reading
+                        // this is going to be =entry.kanji, minus one entry in some cases, preserving order
+                        var filteredKanji: [String] = []
+                        for i in 0..<entry.kanji.count {
+                            let k = entry.kanji[i]
+                            if k.hiragana == reading {
+                                // prefer ラップトップピーシー to らっぷとっぷぴーしー and leave ラップトップＰＣ as the only "kanji"
+                                // also prefer ラップおん to らっぷおん and leave ラップ音 as the only kanji
+                                bestReading = k
+                                filteredKanji += entry.kanji[(i+1)..<entry.kanji.count]
+                                break
+                            }
+                            filteredKanji.append(k)
+                        }
                         // we use append because there could be words sounding the same
-                        words[oomojied, default: []].append(DictWord(reading: reading, kanji: entry.kanji, senses: entry.senses))
+                        words[oomojied, default: []].append(DictWord(reading: bestReading, kanji: filteredKanji, senses: entry.senses))
                     }
                 }
                 inEntry = false
